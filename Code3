@@ -1,0 +1,186 @@
+import cv2
+import itertools
+import numpy as np
+from time import time
+import mediapipe as mp
+import matplotlib.pyplot as plt 
+
+
+mp_face_detection = mp.solutions.face_detection
+face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+mp_drawing = mp.solutions.drawing_utils
+
+
+
+
+
+
+sample_img = cv2.imread('7.jpg')
+plt.figure(figsize = [10, 10])
+plt.title("Sample Image");plt.axis('off');plt.imshow(sample_img[:,:,::-1]);plt.show()
+face_detection_results = face_detection.process(sample_img[:,:,::-1])
+if face_detection_results.detections:
+    for face_no, face in enumerate(face_detection_results.detections):
+        print(f'FACE NUMBER: {face_no+1}')
+        print('---------------------------------')
+        print(f'FACE CONFIDENCE: {round(face.score[0], 2)}')
+        face_data = face.location_data
+        print(f'\nFACE BOUNDING BOX:\n{face_data.relative_bounding_box}')
+        for i in range(2):
+ 
+
+            print(f'{mp_face_detection.FaceKeyPoint(i).name}:')
+            print(f'{face_data.relative_keypoints[mp_face_detection.FaceKeyPoint(i).value]}') 
+
+
+
+
+
+
+img_copy = sample_img[:,:,::-1].copy()
+if face_detection_results.detections:
+    for face_no, face in enumerate(face_detection_results.detections):
+        mp_drawing.draw_detection(image=img_copy, detection=face, 
+                                 keypoint_drawing_spec=mp_drawing.DrawingSpec(color=(255, 0, 0),
+                                                                              thickness=2,
+                                                                              circle_radius=2))
+
+fig = plt.figure(figsize = [10, 10])
+plt.title("Resultant Image");plt.axis('off');plt.imshow(img_copy);plt.show()
+
+
+
+
+
+
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh_images = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=2,
+                                         min_detection_confidence=0.5)
+face_mesh_videos = mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, 
+                                         min_detection_confidence=0.5,min_tracking_confidence=0.3)
+mp_drawing_styles = mp.solutions.drawing_styles
+face_mesh_results = face_mesh_images.process(sample_img[:,:,::-1])
+LEFT_EYE_INDEXES = list(set(itertools.chain(*mp_face_mesh.FACEMESH_LEFT_EYE)))
+RIGHT_EYE_INDEXES = list(set(itertools.chain(*mp_face_mesh.FACEMESH_RIGHT_EYE)))
+ 
+if face_mesh_results.multi_face_landmarks:
+    for face_no, face_landmarks in enumerate(face_mesh_results.multi_face_landmarks):
+        print(f'FACE NUMBER: {face_no+1}')
+        print('-----------------------')
+        print(f'LEFT EYE LANDMARKS:\n')
+        for LEFT_EYE_INDEX in LEFT_EYE_INDEXES[:2]:
+            print(face_landmarks.landmark[LEFT_EYE_INDEX])
+        print(f'RIGHT EYE LANDMARKS:\n')
+        for RIGHT_EYE_INDEX in RIGHT_EYE_INDEXES[:2]:
+            print(face_landmarks.landmark[RIGHT_EYE_INDEX])
+
+
+
+
+
+img_copy = sample_img[:,:,::-1].copy()
+if face_mesh_results.multi_face_landmarks:
+    for face_landmarks in face_mesh_results.multi_face_landmarks:
+        mp_drawing.draw_landmarks(image=img_copy, 
+                                  landmark_list=face_landmarks,connections=mp_face_mesh.FACEMESH_TESSELATION,
+                                  landmark_drawing_spec=None, 
+                                  connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style())
+        
+        mp_drawing.draw_landmarks(image=img_copy, landmark_list=face_landmarks,connections=mp_face_mesh.FACEMESH_CONTOURS,
+                                  landmark_drawing_spec=None, 
+                                  connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style())
+        
+fig = plt.figure(figsize = [10, 10])
+plt.title("Resultant Image");plt.axis('off');plt.imshow(img_copy);plt.show()
+
+
+
+def detectFacialLandmarks(image, face_mesh, display = True):
+    results = face_mesh.process(image[:,:,::-1])
+    output_image = image[:,:,::-1].copy()
+    if results.multi_face_landmarks:
+        for face_landmarks in results.multi_face_landmarks:
+            mp_drawing.draw_landmarks(image=output_image, landmark_list=face_landmarks,
+                                      connections=mp_face_mesh.FACEMESH_TESSELATION,
+                                      landmark_drawing_spec=None, 
+                                      connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style())
+            mp_drawing.draw_landmarks(image=output_image, landmark_list=face_landmarks,
+                                      connections=mp_face_mesh.FACEMESH_CONTOURS,
+                                      landmark_drawing_spec=None, 
+                                      connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style())
+
+    if display:
+        plt.figure(figsize=[15,15])
+        plt.subplot(121);plt.imshow(image[:,:,::-1]);plt.title("Original Image");plt.axis('off');
+        plt.subplot(122);plt.imshow(output_image);plt.title("Output");plt.axis('off');
+    else:
+        return np.ascontiguousarray(output_image[:,:,::-1], dtype=np.uint8), results              
+    
+
+image = cv2.imread('7.jpg')
+detectFacialLandmarks(image, face_mesh_images, display=True)
+
+def getSize(image, face_landmarks, INDEXES):
+    image_height, image_width, _ = image.shape
+    INDEXES_LIST = list(itertools.chain(*INDEXES))
+    landmarks = []
+    for INDEX in INDEXES_LIST:
+        landmarks.append([int(face_landmarks.landmark[INDEX].x * image_width),
+                               int(face_landmarks.landmark[INDEX].y * image_height)])
+    _, _, width, height = cv2.boundingRect(np.array(landmarks))  
+    landmarks = np.array(landmarks)
+    
+    return width, height, landmarks
+
+
+
+def isOpen(image, face_mesh_results, face_part, threshold=5, display=True):
+    image_height, image_width, _ = image.shape
+    output_image = image.copy()
+    status={}
+    if face_part == 'MOUTH':
+        INDEXES = mp_face_mesh.FACEMESH_LIPS
+        loc = (10, image_height - image_height//40)
+        increment=-30
+    elif face_part == 'LEFT EYE':
+        INDEXES = mp_face_mesh.FACEMESH_LEFT_EYE
+        loc = (10, 30)
+        increment=30
+    elif face_part == 'RIGHT EYE':
+        INDEXES = mp_face_mesh.FACEMESH_RIGHT_EYE 
+        loc = (image_width-300, 30)
+        increment=30
+    else:
+        return
+    
+    for face_no, face_landmarks in enumerate(face_mesh_results.multi_face_landmarks):
+        _, height, _ = getSize(image, face_landmarks, INDEXES)
+        _, face_height, _ = getSize(image, face_landmarks, mp_face_mesh.FACEMESH_FACE_OVAL)
+        if (height/face_height)*100 > threshold:
+            status[face_no] = 'OPEN'
+            color=(0,255,0)
+        else:
+            status[face_no] = 'CLOSE'
+            color=(0,0,255)
+        cv2.putText(output_image, f'FACE {face_no+1} {face_part} {status[face_no]}.', 
+                    (loc[0],loc[1]+(face_no*increment)), cv2.FONT_HERSHEY_PLAIN, 1.4, color, 2)
+                
+    if display:
+        plt.figure(figsize=(10,10))
+        plt.imshow(output_image[:,:,::-1]);plt.title("Output Image");plt.axis('off');
+    else: 
+        return output_image, status
+    
+
+
+
+image  = cv2.imread('7.jpg')
+image  = cv2.flip (image,  1)
+_, face_mesh_results = detectFacialLandmarks(image, face_mesh_images, display =False)
+if face_mesh_results.multi_face_landmarks:
+    output_image, _ = isOpen(image, face_mesh_results, 'MOUTH', threshold = 15, display =False)
+    output_image, _ = isOpen(output_image, face_mesh_results, 'LEFT EYE', threshold= 5, display =False)
+    isOpen(output_image, face_mesh_results, 'RIGHT EYE', threshold = 5)
+
+plt.figure(figsize = [10, 10])
+plt.title("Sample Image");plt.axis('off');plt.imshow(sample_img[:,:,::-1]);plt.show()
