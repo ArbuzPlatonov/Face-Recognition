@@ -8,7 +8,7 @@ import mediapipe as mp
 import time
 import pandas
 
-
+#The function of determining the main points of the face
 def face_rec():
     gal_face_img = face_recognition.load_image_file('img/gal.jpg')
     gal_face_location = face_recognition.face_locations(gal_face_img)
@@ -23,7 +23,7 @@ def face_rec():
         draw.rectangle(((left, top),(right, bottom)), outline=(255,0,0), width = 8)
     del draw
     pil_img.save('img/new_gal.jpg')
-
+#Determining the presence of a person
 def extra_face(img_path):
     count = 0
     faces = face_recognition.load_image_file(img_path)
@@ -39,7 +39,7 @@ def extra_face(img_path):
     return f"Found {count} face(s) in this pfoto"
 
 
-
+#Face comparison function
 def compare_faces(img1_path, img2_path):
     img1 = face_recognition.load_image_file(img1_path)
     img1_encodings = face_recognition.face_encodings(img1)[0]
@@ -51,7 +51,7 @@ def compare_faces(img1_path, img2_path):
     result = face_recognition.compare_faces([img1_encodings], img2_encodings)
     print(result)
 
-
+#Neural network learning function
 def train_model(name):
 
     if not os.path.exists("dataset"):
@@ -100,7 +100,7 @@ def train_model(name):
         file.write(pickle.dumps(data))
 
     return f"[INFO] File {name}_encodings.pickle successfully created"
-
+#The function of saving video from the webcam stream
 def save_video():
     cap = cv2.VideoCapture(0)
     frame_width = int(cap.get(3))
@@ -116,7 +116,7 @@ def save_video():
             break
 
 
-
+#The function of creating screenshots from videos
 def take_screenshot_from_video():
     #save_video()
     capture = cv2.VideoCapture('video/video.avi')
@@ -149,7 +149,7 @@ def take_screenshot_from_video():
     capture.release()
     cv2.destroyAllWindows()
 
-
+#The function of determining a person using a trained neural network
 def detect_person_in_video():
     data = pickle.loads(open('Skala_encodings.pickle','rb').read())
     video = cv2.VideoCapture(0)
@@ -180,7 +180,7 @@ def detect_person_in_video():
         if k == ord('q'):
             print('extra closing')
             break
-
+#The function of creating a triangulation mask
 def mask():
     cap = cv2.VideoCapture("IMG_6805.MOV")
     pTime = 0   
@@ -215,7 +215,7 @@ def mask():
 
 
 
-
+#The function of launching other functions
 def main():
     #face_rec()
     #print(extra_face('img/gal.jpg'))
